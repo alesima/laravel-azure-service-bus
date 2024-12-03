@@ -28,16 +28,17 @@
         "phpunit/phpunit": "^6.5|^7.0|^8.0",
         "phpstan/phpstan": "^1.0",
         "squizlabs/php_codesniffer": "^3.0",
-        "friendsofphp/php-cs-fixer": "~3.4"
+        "friendsofphp/php-cs-fixer": "~3.4",
+        "php-coveralls/php-coveralls": "^2.0"
     },
     "autoload": {
         "psr-4": {
-            "LaravelAzureServiceBus\\": "src/"
+            "Alesima\\LaravelAzureServiceBus\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "LaravelAzureServiceBus\\Tests\\": "tests/"
+            "Alesima\\LaravelAzureServiceBus\\Tests\\": "tests/"
         }
     },
     "scripts": {

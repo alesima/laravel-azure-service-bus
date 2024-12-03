@@ -6,6 +6,7 @@ use Alesima\LaravelAzureServiceBus\Connectors\AzureConnector;
 use Alesima\LaravelAzureServiceBus\Drivers\AzureQueue;
 use PHPUnit\Framework\TestCase;
 use WindowsAzure\Common\ServicesBuilder;
+use WindowsAzure\ServiceBus\Internal\IServiceBus;
 
 class AzureConnectorTest extends TestCase
 {
@@ -18,7 +19,7 @@ class AzureConnectorTest extends TestCase
             'queue' => 'testQueue',
         ];
 
-        $mockServiceBus = $this->createMock(\WindowsAzure\ServiceBus\Internal\IServiceBus::class);
+        $mockServiceBus = $this->createMock(IServiceBus::class);
 
         $servicesBuilder = $this->createMock(ServicesBuilder::class);
         $servicesBuilder->method('createServiceBusService')

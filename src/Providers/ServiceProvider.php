@@ -13,7 +13,11 @@ class ServiceProvider extends BaseServiceProvider
      */
     public function register()
     {
-        // You can register additional bindings here if needed.
+        // Merge the default configuration
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/azure-service-bus.php',
+            'azure-service-bus'
+        );
     }
 
     /**
@@ -21,6 +25,12 @@ class ServiceProvider extends BaseServiceProvider
      */
     public function boot()
     {
+        // Publish the configuration file
+        $this->publishes([
+            __DIR__ . '/../config/azure-service-bus.php' => config_path('azure-service-bus.php'),
+        ], 'config');
+
+        // Register the Azure queue connector
         $this->app->resolving('queue', function (QueueManager $queueManager) {
             $queueManager->addConnector('azure', function () {
                 return new AzureConnector();

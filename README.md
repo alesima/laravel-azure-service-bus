@@ -51,6 +51,22 @@ AZURE_SERVICE_BUS_TOPICS=topic1,topic2,topic3
 
 ---
 
+## Local Development & Testing with Docker 🐳
+
+For local development and testing, you can use the official PHP 7.4 Docker image to ensure compatibility.
+
+Run the following command to install dependencies using Docker:
+
+```bash
+docker run --rm \
+    -v $(pwd):/app \
+    -w /app \
+    php:7.4-cli \
+    bash -c "apt-get update && apt-get install -y zip unzip git && curl -sS https://getcomposer.org/installer | php && php composer.phar install"
+```
+
+---
+
 ## Usage 🛠️
 
 ### **Queue Operations**
@@ -151,23 +167,11 @@ foreach ($topics as $topic) {
 
 ---
 
-## Configuration for Multiple Topics 🛠️
-
-Set the `AZURE_SERVICE_BUS_TOPICS` environment variable as a comma-separated list of topics. You can retrieve and process these dynamically in your application.
-
-Example:
-
-```env
-AZURE_SERVICE_BUS_TOPICS=topic1,topic2,topic3
-```
-
----
-
 ## Compatibility 🧩
 
 This package is compatible with:
 - **Laravel**: 5.x, 6.x, 7.x, and 8.x.
-- **PHP**: 7.0 to 7.4.
+- **PHP**: 7.2 to 7.4.
 
 ---
 

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<ruleset name="Laravel Package Code Style">
+    <description>Coding standards for Laravel-compatible packages.</description>
+
+    <!-- Extend PSR-12 -->
+    <rule ref="PSR12" />
+
+    <!-- Custom Laravel-like rules -->
+    <rule ref="Generic.Arrays.DisallowLongArraySyntax" /> <!-- Use short array syntax -->
+    <rule ref="Generic.Formatting.SpaceAfterCast" /> <!-- Enforce space after cast -->
+    <rule ref="Squiz.Strings.DoubleQuoteUsage.NotRequired" /> <!-- Use single quotes -->
+
+    <!-- Ignore vendor directory -->
+    <exclude-pattern>vendor/*</exclude-pattern>
+</ruleset>

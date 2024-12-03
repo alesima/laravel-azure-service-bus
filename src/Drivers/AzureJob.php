@@ -47,8 +47,13 @@ class AzureJob extends Job implements JobContract
      * @param string $queue
      * @param string $rawMessage
      */
-    public function __construct(Container $container, IServiceBus $azure, BrokeredMessage $job, string $queue, string $rawMessage)
-    {
+    public function __construct(
+        Container $container,
+        IServiceBus $azure,
+        BrokeredMessage $job,
+        string $queue,
+        string $rawMessage
+    ) {
         $this->container = $container;
         $this->azure = $azure;
         $this->job = $job;

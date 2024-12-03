@@ -17,7 +17,7 @@ class AzureConnector implements ConnectorInterface
     public function connect(array $config)
     {
         $connectionString = sprintf(
-            "Endpoint=%s;SharedAccessKeyName=%s;SharedAccessKey=%s",
+            'Endpoint=%s;SharedAccessKeyName=%s;SharedAccessKey=%s',
             $config['endpoint'],
             $config['shared_access_key_name'],
             $config['shared_access_key']

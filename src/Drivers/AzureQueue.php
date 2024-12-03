@@ -139,24 +139,28 @@ class AzureQueue extends Queue implements QueueContract
      * Resolve the delay to a \DateTime object.
      *
      * @param mixed $delay
-     * @return \DateTime
+     * @return \DateTimeInterface
      * @throws \Exception
      */
     protected function resolveDelayToDateTime($delay): \DateTimeInterface
     {
         if ($delay instanceof \DateTimeInterface) {
-            return (new \DateTimeImmutable())->setTimestamp($delay->getTimestamp())->setTimezone(new \DateTimeZone('UTC'));
+            return (new \DateTimeImmutable())
+                ->setTimestamp($delay->getTimestamp())
+                ->setTimezone(new \DateTimeZone('UTC'));
         }
 
         if ($delay instanceof \DateInterval) {
-            return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->add($delay);
+            return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
+                ->add($delay);
         }
 
         if (is_int($delay)) {
-            return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->add(new \DateInterval('PT' . $delay . 'S'));
+            return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
+                ->add(new \DateInterval('PT' . $delay . 'S'));
         }
 
-        throw new \InvalidArgumentException('Invalid delay format. Must be an instance of DateTimeInterface, DateInterval, or an integer.');
+        throw new \InvalidArgumentException('Delay must be an int, DateTimeInterface, or DateInterval.');
     }
 
     /**

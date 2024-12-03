@@ -45,7 +45,13 @@ class AzureJobTest extends TestCase
         $mockMessage = $this->createMock(BrokeredMessage::class);
         $mockMessage->method('getBody')->willReturn('{"job":"TestJob"}');
 
-        $job = new AzureJob(new Container(), $this->createMock(IServiceBus::class), $mockMessage, 'testQueue', 'testPayload');
+        $job = new AzureJob(
+            new Container(),
+            $this->createMock(IServiceBus::class),
+            $mockMessage,
+            'testQueue',
+            'testPayload'
+        );
 
         $this->assertEquals('testPayload', $job->getRawBody());
     }

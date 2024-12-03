@@ -1,0 +1,49 @@
+{
+    "name": "alesima/laravel-azure-service-bus",
+    "description": "A Laravel Queue driver for Azure Service Bus",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Alex Silva",
+            "email": "alex@codingwithalex.com",
+            "role": "developer"
+        }
+    ],
+    "keywords": [
+        "azure",
+        "servicebus",
+        "queue",
+        "laravel"
+    ],
+    "homepage": "https://github.com/alesima/laravel-azure-service-bus",
+    "type": "library",
+    "require": {
+        "php": ">=7.0",
+        "illuminate/queue": "^5.0|^6.0|^7.0|^8.0|^9.0|^10.0",
+        "microsoft/windowsazure": "^0.5"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^6.5|^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "LaravelAzureServiceBus\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "LaravelAzureServiceBus\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "LaravelAzureServiceBus\\Providers\\ServiceProvider"
+            ]
+        }
+    }
+}

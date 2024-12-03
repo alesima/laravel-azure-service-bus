@@ -125,10 +125,6 @@ class AzureQueue extends Queue implements QueueContract
         $releaseTime = $this->resolveDelayToDateTime($delay);
         $payload = $this->createPayload($job, $data);
 
-        if ($releaseTime instanceof \DateTimeImmutable) {
-            $releaseTime = \DateTime::createFromImmutable($releaseTime);
-        }
-
         $message = new BrokeredMessage($payload);
         $message->setScheduledEnqueueTimeUtc($releaseTime);
 
@@ -139,29 +135,36 @@ class AzureQueue extends Queue implements QueueContract
      * Resolve the delay to a \DateTime object.
      *
      * @param mixed $delay
-     * @return \DateTimeInterface
+     * @return \DateTime
      * @throws \Exception
      */
-    protected function resolveDelayToDateTime($delay): \DateTimeInterface
+    protected function resolveDelayToDateTime($delay): \DateTime
     {
         if ($delay instanceof \DateTimeInterface) {
-            return (new \DateTimeImmutable())
-                ->setTimestamp($delay->getTimestamp())
-                ->setTimezone(new \DateTimeZone('UTC'));
+            $dateTime = new \DateTime();
+            $dateTime->setTimestamp($delay->getTimestamp());
+            $dateTime->setTimezone(new \DateTimeZone('UTC'));
+
+            return $dateTime;
         }
 
         if ($delay instanceof \DateInterval) {
-            return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
-                ->add($delay);
+            $dateTime = new \DateTime('now', new \DateTimeZone('UTC'));
+            $dateTime->add($delay);
+
+            return $dateTime;
         }
 
         if (is_int($delay)) {
-            return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
-                ->add(new \DateInterval('PT' . $delay . 'S'));
+            $dateTime = new \DateTime('now', new \DateTimeZone('UTC'));
+            $dateTime->add(new \DateInterval('PT' . $delay . 'S'));
+
+            return $dateTime;
         }
 
         throw new \InvalidArgumentException('Delay must be an int, DateTimeInterface, or DateInterval.');
     }
+
 
     /**
      * Pop the next job off of the queue.

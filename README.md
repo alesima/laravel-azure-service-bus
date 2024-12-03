@@ -13,7 +13,7 @@ This package provides a **custom queue driver** for Laravel that integrates with
 ## Features 🎯
 
 - **Azure Service Bus Integration**: Seamlessly integrate Azure's messaging capabilities into your Laravel application.
-- **Support for Laravel 5.x - 8.x**: Compatible with older Laravel versions and PHP 7.x.
+- **Support for Laravel 5.x - 8.x**: Compatible with older Laravel versions and PHP 7.2 and above.
 - **Queue Operations**: Push, pop, and manage jobs in Azure Service Bus queues with ease.
 - **Pub/Sub Module**: Publish messages to multiple topics and subscribe to them using Azure Service Bus topics and subscriptions.
 - **Job Scheduling**: Supports delayed jobs using `later()` with multiple formats (e.g., `DateTime`, `DateInterval`, `int`).

@@ -13,7 +13,7 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                php: [7.0, 7.1, 7.2, 7.3, 7.4]
+                php: [7.2, 7.3, 7.4]
 
         steps:
             # Checkout the repository
@@ -43,7 +43,7 @@ jobs:
 
             # Install dependencies
             - name: Install dependencies
-              run: composer install --prefer-dist --no-progress --no-suggest
+              run: composer install --prefer-dist --no-progress --no-suggest --dev
 
             # Run static analysis (optional, but recommended)
             - name: Run PHPStan

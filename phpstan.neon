@@ -7,3 +7,5 @@ parameters:
         - vendor
     checkMissingIterableValueType: true
     checkExplicitMixed: true
+    ignoreErrors:
+        - '#Function config_path not found#'

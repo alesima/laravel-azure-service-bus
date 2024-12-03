@@ -4,18 +4,19 @@
 [![GitHub issues](https://img.shields.io/github/issues/alesima/laravel-azure-service-bus.svg)](https://github.com/alesima/laravel-azure-service-bus/issues)
 [![License](https://img.shields.io/github/license/alesima/laravel-azure-service-bus.svg)](https://github.com/alesima/laravel-azure-service-bus/blob/main/LICENSE)
 
-> Integrate **Azure Service Bus** as a queue driver in Laravel.
+> Integrate **Azure Service Bus** as a queue driver and Pub/Sub module in Laravel, now with support for multiple topics.
 
-This package provides a **custom queue driver** for Laravel that integrates with **Azure Service Bus**, allowing you to manage jobs in your queues using Azure's powerful messaging platform.
+This package provides a **custom queue driver** for Laravel that integrates with **Azure Service Bus** and adds support for **Topics and Subscriptions (Pub/Sub)**, enabling both queue-based and publish/subscribe messaging models with the ability to manage multiple topics dynamically.
 
 ---
 
 ## Features 🎯
 
 - **Azure Service Bus Integration**: Seamlessly integrate Azure's messaging capabilities into your Laravel application.
-- **Support for Laravel 5.x - 10.x**: Works with a wide range of Laravel versions.
-- **Job Scheduling**: Supports delayed jobs using `later()` with multiple formats (e.g., `DateTime`, `DateInterval`, `int`).
+- **Support for Laravel 5.x - 8.x**: Compatible with older Laravel versions and PHP 7.x.
 - **Queue Operations**: Push, pop, and manage jobs in Azure Service Bus queues with ease.
+- **Pub/Sub Module**: Publish messages to multiple topics and subscribe to them using Azure Service Bus topics and subscriptions.
+- **Job Scheduling**: Supports delayed jobs using `later()` with multiple formats (e.g., `DateTime`, `DateInterval`, `int`).
 - **Built with Laravel's Queuing System**: Follows the same conventions, making it easy to work with.
 
 ---
@@ -45,29 +46,16 @@ AZURE_SERVICE_BUS_ENDPOINT=https://<your-namespace>.servicebus.windows.net
 AZURE_SERVICE_BUS_KEY_NAME=<your-key-name>
 AZURE_SERVICE_BUS_KEY=<your-key>
 AZURE_SERVICE_BUS_QUEUE=<your-queue-name>
-```
-
-### 4. Add to `config/queue.php`:
-
-Update your `config/queue.php` to add the Azure connection:
-
-```php
-'connections' => [
-    'azureservicebus' => [
-        'driver' => 'azureservicebus',
-        'endpoint' => env('AZURE_SERVICE_BUS_ENDPOINT'),
-        'shared_access_key_name' => env('AZURE_SERVICE_BUS_KEY_NAME'),
-        'shared_access_key' => env('AZURE_SERVICE_BUS_KEY'),
-        'queue' => env('AZURE_SERVICE_BUS_QUEUE'),
-    ],
-],
+AZURE_SERVICE_BUS_TOPICS=topic1,topic2,topic3
 ```
 
 ---
 
 ## Usage 🛠️
 
-### Push Jobs onto the Queue ⬆️
+### **Queue Operations**
+
+#### Push Jobs onto the Queue ⬆️
 
 You can push jobs to Azure Service Bus using the standard Laravel syntax:
 
@@ -77,24 +65,21 @@ use App\Jobs\MyJob;
 dispatch(new MyJob($data)); // Push to the default queue
 ```
 
-### Use `later()` for Delayed Jobs ⏳
+#### Use `later()` for Delayed Jobs ⏳
 
 You can schedule jobs to be pushed after a delay using various formats:
 
 ```php
-// Using an integer (seconds)
 dispatch((new MyJob($data))->delay(60)); // Delay by 60 seconds
 
-// Using a DateInterval
 $interval = new \DateInterval('PT10M'); // 10 minutes
 dispatch((new MyJob($data))->delay($interval));
 
-// Using a DateTime
 $releaseTime = new \DateTime('+1 hour');
 dispatch((new MyJob($data))->delay($releaseTime));
 ```
 
-### Handling Jobs 🚀
+#### Handle Jobs 🚀
 
 When a job is received from the queue, it will be processed as a standard Laravel job:
 
@@ -105,21 +90,84 @@ public function handle()
 }
 ```
 
-### Manually Release a Job 📥
+---
 
-To release a job back into the queue:
+### **Pub/Sub Module**
 
-```php
-$job->release(60); // Release the job back to the queue with a 60-second delay
-```
+The Pub/Sub module enables publishing messages to Azure Service Bus topics and receiving them from subscriptions. This now supports managing multiple topics dynamically.
 
-### Delete a Job 🗑️
+#### Publish Messages to a Topic 📢
 
-To delete a job from the queue:
+You can publish a message to a specific topic:
 
 ```php
-$job->delete();
+use LaravelAzureServiceBus\Services\AzurePubSubService;
+
+$pubSub = app(AzurePubSubService::class);
+
+// Publish to a specific topic
+$pubSub->publishMessage('topic1', [
+    'event' => 'user.created',
+    'data' => ['user_id' => 123],
+]);
 ```
+
+#### Subscribe to a Specific Topic 🔔
+
+To retrieve messages from a subscription under a specific topic:
+
+```php
+use LaravelAzureServiceBus\Services\AzurePubSubService;
+
+$pubSub = app(AzurePubSubService::class);
+
+// Subscribe to messages from 'topic1'
+$messages = $pubSub->retrieveMessages('topic1', 'subscription1');
+
+foreach ($messages as $message) {
+    echo $message; // Process the message
+}
+```
+
+#### Retrieve Messages from Multiple Topics 🔄
+
+To work with multiple topics dynamically:
+
+```php
+use LaravelAzureServiceBus\Services\AzurePubSubService;
+
+$pubSub = app(AzurePubSubService::class);
+
+// Retrieve messages from multiple topics
+$topics = ['topic1', 'topic2', 'topic3'];
+
+foreach ($topics as $topic) {
+    $messages = $pubSub->retrieveMessages($topic, 'subscription1');
+    foreach ($messages as $message) {
+        echo "From {$topic}: " . $message;
+    }
+}
+```
+
+---
+
+## Configuration for Multiple Topics 🛠️
+
+Set the `AZURE_SERVICE_BUS_TOPICS` environment variable as a comma-separated list of topics. You can retrieve and process these dynamically in your application.
+
+Example:
+
+```env
+AZURE_SERVICE_BUS_TOPICS=topic1,topic2,topic3
+```
+
+---
+
+## Compatibility 🧩
+
+This package is compatible with:
+- **Laravel**: 5.x, 6.x, 7.x, and 8.x.
+- **PHP**: 7.0 to 7.4.
 
 ---
 
@@ -155,6 +203,7 @@ We welcome contributions to make this package even better!
 - **[Azure SDK for PHP](https://github.com/Azure/azure-sdk-for-php)**: Provides the integration with Azure Service Bus.
 - **[Laravel](https://laravel.com/)**: The PHP framework that powers this package.
 
+---
 
 ## Attribution
 

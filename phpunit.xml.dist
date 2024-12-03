@@ -11,11 +11,11 @@
             <directory>tests</directory>
         </testsuite>
     </testsuites>
-    <coverage>
-        <include>
+    <filter>
+        <whitelist>
             <directory suffix=".php">src</directory>
-        </include>
-    </coverage>
+        </whitelist>
+    </filter>
     <php>
         <env name="APP_ENV" value="testing" />
         <env name="CACHE_DRIVER" value="array" />

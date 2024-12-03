@@ -1,9 +1,9 @@
 <?php
 
-namespace LaravelAzureServiceBus\Connectors;
+namespace Alesima\LaravelAzureServiceBus\Connectors;
 
+use Alesima\LaravelAzureServiceBus\Drivers\AzureQueue;
 use Illuminate\Queue\Connectors\ConnectorInterface;
-use LaravelAzureServiceBus\Drivers\AzureQueue;
 use WindowsAzure\Common\ServicesBuilder;
 
 class AzureConnector implements ConnectorInterface

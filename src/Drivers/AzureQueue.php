@@ -1,15 +1,14 @@
 <?php
 
-namespace LaravelAzureServiceBus\Drivers;
+namespace Alesima\LaravelAzureServiceBus\Drivers;
 
+use DateInterval;
+use DateTime;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Queue\Queue;
 use WindowsAzure\ServiceBus\Internal\IServiceBus;
 use WindowsAzure\ServiceBus\Models\BrokeredMessage;
 use WindowsAzure\ServiceBus\Models\ReceiveMessageOptions;
-use DateTime;
-use DateTimeZone;
-use DateInterval;
 
 class AzureQueue extends Queue implements QueueContract
 {

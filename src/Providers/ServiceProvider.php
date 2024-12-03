@@ -1,10 +1,10 @@
 <?php
 
-namespace LaravelAzureServiceBus\Providers;
+namespace Alesima\LaravelAzureServiceBus\Providers;
 
+use Alesima\LaravelAzureServiceBus\Connectors\AzureConnector;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
-use LaravelAzureServiceBus\Connectors\AzureConnector;
 
 class ServiceProvider extends BaseServiceProvider
 {

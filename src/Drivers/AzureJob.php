@@ -1,6 +1,6 @@
 <?php
 
-namespace LaravelAzureServiceBus\Drivers;
+namespace Alesima\LaravelAzureServiceBus\Drivers;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;

@@ -1,5 +1,4 @@
 service_name: github
 coverage_clover: build/logs/clover.xml
 json_path: build/logs/coveralls-upload.json
-service_job_id: $GITHUB_RUN_ID
 repo_token: $COVERALLS_REPO_TOKEN

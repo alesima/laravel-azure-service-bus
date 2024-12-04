@@ -1,6 +1,7 @@
 # Laravel Azure Service Bus Queue Driver 🚀
 
 [![Packagist](https://img.shields.io/packagist/v/alesima/laravel-azure-service-bus.svg)](https://packagist.org/packages/alesima/laravel-azure-service-bus)
+[![Coverage Status](https://coveralls.io/repos/github/alesima/laravel-azure-service-bus/badge.svg?branch=master)](https://coveralls.io/github/alesima/laravel-azure-service-bus?branch=master)
 [![GitHub issues](https://img.shields.io/github/issues/alesima/laravel-azure-service-bus.svg)](https://github.com/alesima/laravel-azure-service-bus/issues)
 [![License](https://img.shields.io/github/license/alesima/laravel-azure-service-bus.svg)](https://github.com/alesima/laravel-azure-service-bus/blob/main/LICENSE)
 

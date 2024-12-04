@@ -60,9 +60,9 @@ Update your `config/queue.php` file to include the following configuration for t
     'azureservicebus' => [
         'driver' => 'azureservicebus',
         'endpoint' => sprintf('https://%s.servicebus.windows.net/', env('SERVICE_BUS_NAMESPACE')),
-        'SharedAccessKeyName' => env('SERVICE_BUS_SHARED_ACCESS_KEY_NAME'),
-        'SharedAccessKey' => env('SERVICE_BUS_SHARED_ACCESS_KEY'),
-        'queue' => 'solicitacao-default',
+        'shared_access_key_name' => env('SERVICE_BUS_SHARED_ACCESS_KEY_NAME'),
+        'shared_access_key' => env('SERVICE_BUS_SHARED_ACCESS_KEY'),
+        'queue' => 'default',
         'UseTopic' => false,
     ],
 ],

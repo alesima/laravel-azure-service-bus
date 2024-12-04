@@ -3,6 +3,7 @@
 namespace Alesima\LaravelAzureServiceBus\Connectors;
 
 use Alesima\LaravelAzureServiceBus\Drivers\AzureQueue;
+use Illuminate\Container\Container;
 use Illuminate\Queue\Connectors\ConnectorInterface;
 use WindowsAzure\Common\ServicesBuilder;
 
@@ -25,6 +26,10 @@ class AzureConnector implements ConnectorInterface
 
         $serviceBus = ServicesBuilder::getInstance()->createServiceBusService($connectionString);
 
-        return new AzureQueue($serviceBus, $config['queue']);
+        $queue = new AzureQueue($serviceBus, $config['queue']);
+
+        $queue->setContainer(Container::getInstance());
+
+        return $queue;
     }
 }

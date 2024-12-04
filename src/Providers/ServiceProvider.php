@@ -9,32 +9,14 @@ use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 class ServiceProvider extends BaseServiceProvider
 {
     /**
-     * Register any application services.
-     */
-    public function register()
-    {
-        // Merge the default configuration
-        $this->mergeConfigFrom(
-            __DIR__ . '/../config/azure-service-bus.php',
-            'azure-service-bus'
-        );
-    }
-
-    /**
      * Bootstrap the application services.
      */
     public function boot()
     {
-        // Publish the configuration file
-        $this->publishes([
-            __DIR__ . '/../config/azure-service-bus.php' => config_path('azure-service-bus.php'),
-        ], 'config');
+        $manager = $this->app['queue'];
 
-        // Register the Azure queue connector
-        $this->app->resolving('queue', function (QueueManager $queueManager) {
-            $queueManager->addConnector('azure', function () {
-                return new AzureConnector();
-            });
+        $manager->addConnector('azureservicebus', function () {
+            return new AzureConnector();
         });
     }
 }

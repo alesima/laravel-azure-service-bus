@@ -3,56 +3,56 @@
 namespace Alesima\LaravelAzureServiceBus\Tests;
 
 use Alesima\LaravelAzureServiceBus\Drivers\AzureJob;
-use Illuminate\Container\Container;
+use Alesima\LaravelAzureServiceBus\Drivers\AzureQueue;
 use PHPUnit\Framework\TestCase;
 use WindowsAzure\ServiceBus\Internal\IServiceBus;
 use WindowsAzure\ServiceBus\Models\BrokeredMessage;
 
-class AzureJobTest extends TestCase
+class AzureQueueTest extends TestCase
 {
-    public function testDelete()
+    protected $queue;
+
+    protected function setUp(): void
+    {
+        $mockServiceBus = $this->createMock(IServiceBus::class);
+        $this->queue = new AzureQueue($mockServiceBus, 'testQueue');
+    }
+
+    public function testPushRaw()
     {
         $mockMessage = $this->createMock(BrokeredMessage::class);
 
         $mockServiceBus = $this->createMock(IServiceBus::class);
         $mockServiceBus->expects($this->once())
-            ->method('deleteMessage')
-            ->with($mockMessage);
+            ->method('sendQueueMessage')
+            ->with('testQueue', $mockMessage);
 
-        $job = new AzureJob(new Container(), $mockServiceBus, $mockMessage, 'testQueue', 'testPayload');
-        $job->delete();
-
-        $this->assertTrue(true); // No exception means success
+        $queue = new AzureQueue($mockServiceBus, 'testQueue');
+        $queue->pushRaw('testPayload');
     }
 
-    public function testRelease()
-    {
-        $mockMessage = $this->createMock(BrokeredMessage::class);
-
-        $mockServiceBus = $this->createMock(IServiceBus::class);
-        $mockServiceBus->expects($this->once())
-            ->method('unlockMessage')
-            ->with($mockMessage);
-
-        $job = new AzureJob(new Container(), $mockServiceBus, $mockMessage, 'testQueue', 'testPayload');
-        $job->release(60);
-
-        $this->assertTrue(true); // No exception means success
-    }
-
-    public function testGetRawBody()
+    public function testPop()
     {
         $mockMessage = $this->createMock(BrokeredMessage::class);
         $mockMessage->method('getBody')->willReturn('{"job":"TestJob"}');
 
-        $job = new AzureJob(
-            new Container(),
-            $this->createMock(IServiceBus::class),
-            $mockMessage,
-            'testQueue',
-            'testPayload'
-        );
+        $mockServiceBus = $this->createMock(IServiceBus::class);
+        $mockServiceBus->method('receiveQueueMessage')
+            ->willReturn($mockMessage);
 
-        $this->assertEquals('testPayload', $job->getRawBody());
+        $queue = new AzureQueue($mockServiceBus, 'testQueue');
+        $job = $queue->pop();
+
+        $this->assertInstanceOf(AzureJob::class, $job);
+    }
+
+    public function testLater()
+    {
+        $mockServiceBus = $this->createMock(IServiceBus::class);
+
+        $queue = new AzureQueue($mockServiceBus, 'testQueue');
+        $queue->later(60, 'TestJob', ['data' => 'value']);
+
+        $this->assertTrue(true); // No exception means success
     }
 }

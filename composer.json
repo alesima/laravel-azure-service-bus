@@ -46,7 +46,27 @@
         "format": "vendor/bin/phpcbf --standard=.phpcs.xml src tests",
         "fix": "vendor/bin/php-cs-fixer fix",
         "analyse": "vendor/bin/phpstan analyse",
-        "test": "vendor/bin/phpunit"
+        "test": "vendor/bin/phpunit",
+        "coverage": "vendor/bin/phpunit --coverage-html coverage",
+        "test-coverage": "vendor/bin/phpunit --coverage-clover build/logs/clover.xml",
+        "coverage-upload": "vendor/bin/php-coveralls -v",
+        "clean": "rm -rf build coverage",
+        "security-check": "composer audit",
+        "update-deps": "composer update --with-dependencies",
+        "optimize-autoloader": "composer dump-autoload --optimize",
+        "validate": "composer validate --strict",
+        "prepare": [
+            "@clean",
+            "@optimize-autoloader",
+            "@lint",
+            "@analyse"
+        ],
+        "check-all": [
+            "@lint",
+            "@analyse",
+            "@test",
+            "@coverage"
+        ]
     },
     "extra": {
         "laravel": {

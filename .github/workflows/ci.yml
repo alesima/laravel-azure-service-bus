@@ -59,7 +59,7 @@ jobs:
 
             # Upload coverage to Coveralls
             - name: Upload coverage to Coveralls
-              run: vendor/bin/coveralls -v
+              run: vendor/bin/php-coveralls -v
               env:
                   COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
 

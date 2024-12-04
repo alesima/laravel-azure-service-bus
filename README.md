@@ -50,7 +50,79 @@ AZURE_SERVICE_BUS_QUEUE=<your-queue-name>
 AZURE_SERVICE_BUS_TOPICS=topic1,topic2,topic3
 ```
 
-### 4. Register the service provider (optional):
+### **4. Define `config_path()` Helper for Lumen** (optional):
+
+If you are using Lumen and encounter issues with the `config_path()` function, you can define it manually. Here are two approaches:
+
+---
+
+#### Option 1: Define Directly in `bootstrap/app.php`
+
+Add the following code to your `bootstrap/app.php` file:
+
+```php
+if (!function_exists('config_path')) {
+    /**
+     * Get the configuration path.
+     *
+     * @param  string  $path
+     * @return string
+     */
+    function config_path($path = '')
+    {
+        return app()->basePath('config') . ($path ? DIRECTORY_SEPARATOR . $path : $path);
+    }
+}
+```
+
+This helper ensures compatibility when the package calls `config_path()`.
+
+---
+
+#### Option 2: Create a Custom Helpers File
+
+1. **Create a `helpers.php` file:**
+
+   In your project's root directory, create a `helpers.php` file and define the helper function:
+
+   ```php
+   if (!function_exists('config_path')) {
+       /**
+        * Get the configuration path.
+        *
+        * @param  string  $path
+        * @return string
+        */
+       function config_path($path = '')
+       {
+           return app()->basePath('config') . ($path ? DIRECTORY_SEPARATOR . $path : $path);
+       }
+   }
+   ```
+
+2. **Include `helpers.php` in `composer.json`:**
+
+   Add the `helpers.php` file to the `autoload` section of your `composer.json` file:
+
+   ```json
+   "autoload": {
+       "files": [
+           "helpers.php"
+       ]
+   }
+   ```
+
+3. **Run Composer Dump-Autoload:**
+
+   Execute the following command to refresh the autoload files:
+
+   ```bash
+   composer dump-autoload
+   ```
+
+---
+
+### 5. Register the service provider (optional):
 
 If you are using Lumen, you need to register the service provider in `bootstrap/app.php`:
 

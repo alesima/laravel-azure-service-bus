@@ -50,6 +50,14 @@ AZURE_SERVICE_BUS_QUEUE=<your-queue-name>
 AZURE_SERVICE_BUS_TOPICS=topic1,topic2,topic3
 ```
 
+### 4. Register the service provider (optional):
+
+If you are using Lumen, you need to register the service provider in `bootstrap/app.php`:
+
+```php
+$app->register(Alesima\LaravelAzureServiceBus\Providers\ServiceProvider::class);
+```
+
 ---
 
 ## Local Development & Testing with Docker 🐳

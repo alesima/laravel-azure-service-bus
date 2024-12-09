@@ -66,15 +66,24 @@ Update your `config/queue.php` file to include the following configuration for t
         'UseTopic' => false,
     ],
 ],
+```
 
 ---
 
-### 5. Register the service provider (optional):
+### 5. Register the service provider and the queue manager (optional):
 
 If you are using Lumen, you need to register the service provider in `bootstrap/app.php`:
 
 ```php
 $app->register(Alesima\LaravelAzureServiceBus\Providers\ServiceProvider::class);
+```
+
+Also you might to register the queue manager in `config/app.php`:
+
+```php
+$app->bind(Illuminate\Queue\QueueManager::class, function ($app) {
+    return $app['queue'];
+});
 ```
 
 ---

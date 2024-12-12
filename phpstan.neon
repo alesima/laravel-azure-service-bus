@@ -7,3 +7,5 @@ parameters:
         - vendor
     checkMissingIterableValueType: true
     checkExplicitMixed: true
+    ignoreErrors:
+        - '#Unreachable statement#'

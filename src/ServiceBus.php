@@ -182,15 +182,20 @@ class ServiceBus extends Queue implements QueueContract
     protected function resolveDelayToDateTime($delay): DateTime
     {
         if ($delay instanceof DateTimeInterface) {
-            return DateTime::createFromInterface($delay)->setTimezone(new \DateTimeZone('UTC'));
+            $dateTime = new DateTime();
+            $dateTime->setTimestamp($delay->getTimestamp());
+            $dateTime->setTimezone(new \DateTimeZone('UTC'));
+            return $dateTime;
         }
 
         if ($delay instanceof DateInterval) {
-            return (new DateTime('now', new \DateTimeZone('UTC')))->add($delay);
+            $dateTime = new DateTime('now', new \DateTimeZone('UTC'));
+            return $dateTime->add($delay);
         }
 
         if (is_int($delay)) {
-            return (new DateTime('now', new \DateTimeZone('UTC')))->add(new DateInterval("PT{$delay}S"));
+            $dateTime = new DateTime('now', new \DateTimeZone('UTC'));
+            return $dateTime->add(new DateInterval("PT{$delay}S"));
         }
 
         throw new \InvalidArgumentException('Invalid delay type. Must be DateTimeInterface, DateInterval, or int.');

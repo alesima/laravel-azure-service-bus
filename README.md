@@ -102,6 +102,15 @@ docker run --rm \
     bash -c "apt-get update && apt-get install -y zip unzip git && curl -sS https://getcomposer.org/installer | php && php composer.phar install"
 ```
 
+How to test:
+
+```bash
+docker run --rm \
+    -v $(pwd):/app \
+    -w /app \
+    php:7.4-cli \
+    bash -c "apt-get update && apt-get install -y zip unzip git && curl -sS https://getcomposer.org/installer | php && php composer.phar install && vendor/bin/phpunit --no-coverage"
+```
 ---
 
 ## Usage 🛠️

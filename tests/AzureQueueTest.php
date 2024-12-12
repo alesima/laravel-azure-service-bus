@@ -13,14 +13,14 @@ use WindowsAzure\ServiceBus\Models\BrokeredMessage;
 class AzureQueueTest extends TestCase
 {
     /**
-     * The AzureQueue instance
+     * The AzureQueue instance.
      *
      * @var AzureQueue
      */
     protected $queue;
 
     /**
-     * The mock IServiceBus
+     * The mock IServiceBus.
      *
      * @var IServiceBus&MockObject
      */
@@ -28,6 +28,8 @@ class AzureQueueTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         // Create a mock for the IServiceBus
         $this->mockServiceBus = $this->createMock(IServiceBus::class);
 
@@ -39,41 +41,90 @@ class AzureQueueTest extends TestCase
         $this->queue->setContainer($container);
     }
 
-    public function testPushRaw()
+    /**
+     * Test pushing raw payload to the queue.
+     */
+    public function testPushRaw(): void
     {
         $this->mockServiceBus->expects($this->once())
             ->method('sendQueueMessage')
-            ->with('testQueue', $this->callback(function ($message) {
-                return $message instanceof BrokeredMessage && $message->getBody() === 'testPayload';
-            }));
+            ->with(
+                $this->equalTo('testQueue'),
+                $this->callback(function (BrokeredMessage $message) {
+                    return $message instanceof BrokeredMessage && $message->getBody() === 'testPayload';
+                })
+            );
 
         $this->queue->pushRaw('testPayload');
     }
 
-    public function testPop()
+    /**
+     * Test popping a message from the queue.
+     */
+    public function testPop(): void
     {
         $mockMessage = $this->createMock(BrokeredMessage::class);
         $mockMessage->method('getBody')->willReturn('{"job":"TestJob"}');
 
-        $this->mockServiceBus->method('receiveQueueMessage')
+        $this->mockServiceBus->expects($this->once())
+            ->method('receiveQueueMessage')
+            ->with($this->equalTo('testQueue'))
             ->willReturn($mockMessage);
 
         $job = $this->queue->pop();
 
         $this->assertInstanceOf(AzureJob::class, $job);
+        $this->assertEquals('{"job":"TestJob"}', $job->getRawBody());
     }
 
-    public function testLater()
+    /**
+     * Test pushing a job to be executed later.
+     */
+    public function testLater(): void
     {
         $this->mockServiceBus->expects($this->once())
             ->method('sendQueueMessage')
-            ->with('testQueue', $this->callback(function ($message) {
-                $scheduledTime = $message->getScheduledEnqueueTimeUtc();
-                return $message instanceof BrokeredMessage &&
-                    $scheduledTime instanceof \DateTime &&
-                    $scheduledTime > new \DateTime();
-            }));
+            ->with(
+                $this->equalTo('testQueue'),
+                $this->callback(function (BrokeredMessage $message) {
+                    $scheduledTime = $message->getScheduledEnqueueTimeUtc();
+                    return $scheduledTime instanceof \DateTime &&
+                        $scheduledTime > new \DateTime();
+                })
+            );
 
         $this->queue->later(60, 'TestJob', ['data' => 'value']);
+    }
+
+    /**
+     * Test popping when there are no messages in the queue.
+     */
+    public function testPopReturnsNullWhenNoMessage(): void
+    {
+        $this->mockServiceBus->expects($this->once())
+            ->method('receiveQueueMessage')
+            ->with($this->equalTo('testQueue'))
+            ->willReturn(null);
+
+        $job = $this->queue->pop();
+
+        $this->assertNull($job);
+    }
+
+    /**
+     * Test pushing raw payload with a specific queue.
+     */
+    public function testPushRawWithSpecificQueue(): void
+    {
+        $this->mockServiceBus->expects($this->once())
+            ->method('sendQueueMessage')
+            ->with(
+                $this->equalTo('specificQueue'),
+                $this->callback(function (BrokeredMessage $message) {
+                    return $message->getBody() === 'testPayload';
+                })
+            );
+
+        $this->queue->pushRaw('testPayload', 'specificQueue');
     }
 }

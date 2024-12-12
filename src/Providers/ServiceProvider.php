@@ -11,10 +11,21 @@ class ServiceProvider extends BaseServiceProvider
     /**
      * Bootstrap the application services.
      */
-    public function boot(QueueManager $manager)
+    public function boot()
+    {
+        $manager = $this->app['queue'];
+        $this->registerConnector($manager);
+    }
+
+    private function registerConnector(QueueManager $manager)
     {
         $manager->addConnector('azureservicebus', function () {
             return new AzureConnector();
         });
+    }
+
+    public function provides()
+    {
+        return ['azureservicebus'];
     }
 }

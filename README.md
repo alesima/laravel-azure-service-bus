@@ -110,6 +110,13 @@ composer analyse
 composer lint
 ```
 
+## Releasing
+
+No local commands needed. Go to the **Actions** tab → **Release** →
+**Run workflow**, enter the version (`X.Y.Z`, e.g. `2.1.0`). The workflow
+tags `master`, opens a GitHub Release, and the Packagist webhook publishes
+the version automatically.
+
 ## License
 
 MIT.

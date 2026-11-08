@@ -63,13 +63,11 @@ final class CurlHttpTransport implements HttpTransport
 
         if ($responseBody === false) {
             $error = curl_error($handle);
-            curl_close($handle);
 
             throw new ServiceBusException('cURL request failed: ' . $error, 0);
         }
 
         $statusCode = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
-        curl_close($handle);
 
         return new HttpResponse($statusCode, $responseHeaders, (string) $responseBody);
     }

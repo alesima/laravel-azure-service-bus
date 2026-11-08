@@ -5,6 +5,7 @@ parameters:
         - tests
     excludePaths:
         - vendor
+        - tests/Support/stub-server.php
     checkExplicitMixed: true
     ignoreErrors:
         # $delay is mixed by design (DateTimeInterface|DateInterval|int);

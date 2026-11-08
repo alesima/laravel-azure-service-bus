@@ -135,6 +135,77 @@ class RestServiceBusClientTest extends TestCase
         $this->assertSame(self::ENDPOINT . '/orders/messages/id-1/lock-abc', $request['url']);
     }
 
+    public function testDeleteThrowsOnUnexpectedStatus(): void
+    {
+        $transport = new FakeTransport(new HttpResponse(404, [], 'gone'));
+        $client = new RestServiceBusClient(self::ENDPOINT, 'k', 'v', $transport);
+
+        try {
+            $client->deleteMessage(new IncomingMessage('b', 'id-1', 1, self::ENDPOINT . '/q/messages/id-1/lock'));
+            $this->fail('Expected ServiceBusException.');
+        } catch (ServiceBusException $e) {
+            $this->assertSame(404, $e->getStatusCode());
+        }
+    }
+
+    public function testUnlockThrowsOnUnexpectedStatus(): void
+    {
+        $transport = new FakeTransport(new HttpResponse(500, [], 'boom'));
+        $client = new RestServiceBusClient(self::ENDPOINT, 'k', 'v', $transport);
+
+        $this->expectException(ServiceBusException::class);
+
+        $client->unlockMessage(new IncomingMessage('b', 'id-1', 1, self::ENDPOINT . '/q/messages/id-1/lock'));
+    }
+
+    public function testSubscriptionExistsThrowsOnServerError(): void
+    {
+        $transport = new FakeTransport(new HttpResponse(500, [], 'boom'));
+        $client = new RestServiceBusClient(self::ENDPOINT, 'k', 'v', $transport);
+
+        $this->expectException(ServiceBusException::class);
+
+        $client->subscriptionExists('topic', 'sub');
+    }
+
+    public function testCreateSubscriptionThrowsOnServerError(): void
+    {
+        $transport = new FakeTransport(new HttpResponse(500, [], 'boom'));
+        $client = new RestServiceBusClient(self::ENDPOINT, 'k', 'v', $transport);
+
+        try {
+            $client->createSubscription('topic', 'sub');
+            $this->fail('Expected ServiceBusException.');
+        } catch (ServiceBusException $e) {
+            $this->assertSame(500, $e->getStatusCode());
+        }
+    }
+
+    public function testReceiveAccepts200AndThrowsOnServerError(): void
+    {
+        $okTransport = new FakeTransport(new HttpResponse(200, ['brokerproperties' => '{"MessageId":"m"}'], 'hi'));
+        $okClient = new RestServiceBusClient(self::ENDPOINT, 'k', 'v', $okTransport);
+
+        $message = $okClient->receiveQueueMessage('orders');
+        $this->assertInstanceOf(IncomingMessage::class, $message);
+        $this->assertSame('m', $message->getMessageId());
+        $this->assertSame(0, $message->getDeliveryCount());
+
+        $badTransport = new FakeTransport(new HttpResponse(500, [], 'boom'));
+        $badClient = new RestServiceBusClient(self::ENDPOINT, 'k', 'v', $badTransport);
+
+        $this->expectException(ServiceBusException::class);
+        $badClient->receiveQueueMessage('orders');
+    }
+
+    public function testSendIncludesContentTypeWhenSet(): void
+    {
+        $this->client->sendQueueMessage('orders', new OutgoingMessage('hello', null, 'text/plain'));
+
+        $request = $this->transport->lastRequest();
+        $this->assertSame('text/plain', $request['headers']['Content-Type']);
+    }
+
     public function testDeleteWithoutLockLocationThrows(): void
     {
         $this->expectException(InvalidArgumentException::class);

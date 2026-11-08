@@ -1,5 +1,5 @@
 parameters:
-    level: 5
+    level: 8
     paths:
         - src
         - tests
@@ -8,4 +8,6 @@ parameters:
     checkMissingIterableValueType: true
     checkExplicitMixed: true
     ignoreErrors:
-        - '#Unreachable statement#'
+        # $delay is mixed by design (DateTimeInterface|DateInterval|int);
+        # phpstan narrows it to never after the guards.
+        - '#Unreachable statement - code above always terminates#'

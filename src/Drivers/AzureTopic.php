@@ -3,81 +3,109 @@
 namespace Alesima\LaravelAzureServiceBus\Drivers;
 
 use Alesima\LaravelAzureServiceBus\ServiceBus;
+use InvalidArgumentException;
+use Throwable;
 use WindowsAzure\ServiceBus\Models\BrokeredMessage;
 use WindowsAzure\ServiceBus\Models\SubscriptionInfo;
 
 /**
- * Class AzureTopic
- *
- * Extends ServiceBus for Azure Service Bus topics.
+ * Topic / subscription (Pub/Sub) driver on top of ServiceBus.
  */
 class AzureTopic extends ServiceBus
 {
     /**
-     * Publish a message to a topic.
-     *
      * @param string $topic Topic name.
-     * @param string|array $payload Message payload.
-     * @return void
-     * @throws \Exception If sending the message fails.
+     * @param array<array-key,mixed>|string $payload Message body.
      */
     public function publish(string $topic, $payload): void
     {
-        $message = new BrokeredMessage(is_array($payload) ? json_encode($payload) : $payload);
+        if (is_array($payload)) {
+            try {
+                $payload = json_encode($payload, JSON_THROW_ON_ERROR);
+            } catch (Throwable $e) {
+                throw new InvalidArgumentException(
+                    'Topic payload is not JSON serializable: ' . $e->getMessage(),
+                    0,
+                    $e
+                );
+            }
+        }
+
+        if (! is_string($payload)) {
+            throw new InvalidArgumentException('Topic payload must be a string or an array.');
+        }
+
+        $message = new BrokeredMessage($payload);
         $this->sendMessageToTopic($topic, $message);
     }
 
-    /**
-     * Subscribe to a topic subscription and receive a message.
-     *
-     * @param string $topic Topic name.
-     * @param string $subscription Subscription name.
-     * @return BrokeredMessage|null Received message or null if none.
-     * @throws \Exception If receiving the message fails.
-     */
     public function subscribe(string $topic, string $subscription): ?BrokeredMessage
     {
         $this->ensureSubscriptionExists($topic, $subscription);
+
         return $this->receiveMessageFromSubscription($topic, $subscription);
     }
 
-    /**
-     * Send a message to a topic.
-     *
-     * @param string $topic Topic name.
-     * @param BrokeredMessage $message The message to send.
-     * @return void
-     * @throws \Exception If sending the message fails.
-     */
     protected function sendMessageToTopic(string $topic, BrokeredMessage $message): void
     {
         $this->azure->sendTopicMessage($topic, $message);
     }
 
-    /**
-     * Receive a message from a topic subscription.
-     *
-     * @param string $topic Topic name.
-     * @param string $subscription Subscription name.
-     * @return BrokeredMessage|null The received message or null if none.
-     * @throws \Exception If receiving the message fails.
-     */
     protected function receiveMessageFromSubscription(string $topic, string $subscription): ?BrokeredMessage
     {
         return $this->azure->receiveSubscriptionMessage($topic, $subscription, $this->receiveOptions);
     }
 
-    /**
-     * Ensure that a subscription exists for a topic.
-     *
-     * @param string $topic Topic name.
-     * @param string $subscription Subscription name.
-     * @return void
-     * @throws \Exception If creating the subscription fails.
-     */
     protected function ensureSubscriptionExists(string $topic, string $subscription): void
     {
-        $subscriptionInfo = new SubscriptionInfo($subscription);
-        $this->azure->createSubscription($topic, $subscriptionInfo);
+        if (trim($topic) === '' || trim($subscription) === '') {
+            throw new InvalidArgumentException('Topic and subscription names must not be empty.');
+        }
+
+        // Fast path: subscription already exists — skip creation.
+        try {
+            if (method_exists($this->azure, 'getSubscription')) {
+                $existing = $this->azure->getSubscription($topic, $subscription);
+                if ($existing !== null) {
+                    return;
+                }
+            }
+        } catch (Throwable $ignored) {
+            // Fall through to create; a 404 here just means "does not exist".
+        }
+
+        try {
+            $subscriptionInfo = new SubscriptionInfo($subscription);
+            $this->azure->createSubscription($topic, $subscriptionInfo);
+        } catch (Throwable $e) {
+            if ($this->isAlreadyExistsError($e)) {
+                return;
+            }
+
+            throw $e;
+        }
+    }
+
+    private function isAlreadyExistsError(Throwable $e): bool
+    {
+        $message = $e->getMessage();
+        if (stripos($message, '409') !== false) {
+            return true;
+        }
+
+        if (stripos($message, 'Conflict') !== false) {
+            return true;
+        }
+
+        if (stripos($message, 'already exists') !== false) {
+            return true;
+        }
+
+        $code = (string) $e->getCode();
+        if ($code === '409') {
+            return true;
+        }
+
+        return false;
     }
 }

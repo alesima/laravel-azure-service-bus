@@ -1,20 +1,16 @@
 <?php
 
-use PhpCsFixer\Config;
-use PhpCsFixer\Finder;
+$finder = PhpCsFixer\Finder::create()
+    ->in([__DIR__ . '/src', __DIR__ . '/tests', __DIR__ . '/config']);
 
-$finder = Finder::create()
-    ->in(['src', 'tests']) // Directories to include
-    ->exclude('vendor');
-
-return (new Config())
+return (new PhpCsFixer\Config())
+    ->setRiskyAllowed(true)
     ->setRules([
         '@PSR12' => true,
-        'array_syntax' => ['syntax' => 'short'], // Use short arrays
-        'single_quote' => true, // Use single quotes where possible
-        'no_unused_imports' => true, // Remove unused imports
-        'ordered_imports' => ['sort_algorithm' => 'alpha'], // Alphabetize imports
-        'not_operator_with_space' => false, // Consistent NOT operator usage
-        'phpdoc_align' => ['align' => 'left'], // Align PHPDoc comments
+        'array_syntax' => ['syntax' => 'short'],
+        'single_quote' => true,
+        'no_unused_imports' => true,
+        'ordered_imports' => ['sort_algorithm' => 'alpha'],
+        'native_function_invocation' => ['include' => ['@compiler_optimized']],
     ])
     ->setFinder($finder);

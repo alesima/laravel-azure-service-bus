@@ -1,6 +1,5 @@
 {
     "name": "alesima/laravel-azure-service-bus",
-    "version": "2.0.0",
     "description": "A Laravel Queue driver for Azure Service Bus (queues + topics/subscriptions, REST client included)",
     "license": "MIT",
     "authors": [

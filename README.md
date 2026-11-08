@@ -118,10 +118,12 @@ composer lint
 
 ## Releasing
 
-No local commands needed. Go to the **Actions** tab → **Release** →
-**Run workflow**, enter the version (`X.Y.Z`, e.g. `2.1.0`). The workflow
-tags `master`, opens a GitHub Release, and the Packagist webhook publishes
-the version automatically.
+No local commands needed. Put `[release X.Y.Z]` in the squash-merge title
+(e.g. `Add Coveralls job [release 2.1.0]`) — on merge to `master` the
+**Release** workflow tags `vX.Y.Z`, opens the GitHub Release, and the
+Packagist webhook publishes the version automatically. Merges without
+the marker do nothing. Manual dispatch (Actions → Release → Run workflow)
+remains available as a fallback.
 
 ## License
 

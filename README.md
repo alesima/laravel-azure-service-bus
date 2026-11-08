@@ -1,5 +1,11 @@
 # Laravel Azure Service Bus Queue Driver
 
+[![CI](https://github.com/alesima/laravel-azure-service-bus/actions/workflows/ci.yml/badge.svg)](https://github.com/alesima/laravel-azure-service-bus/actions)
+[![Coverage](https://coveralls.io/repos/github/alesima/laravel-azure-service-bus/badge.svg?branch=master)](https://coveralls.io/github/alesima/laravel-azure-service-bus?branch=master)
+[![Packagist](https://img.shields.io/packagist/v/alesima/laravel-azure-service-bus.svg)](https://packagist.org/packages/alesima/laravel-azure-service-bus)
+[![PHP](https://img.shields.io/packagist/php-v/alesima/laravel-azure-service-bus.svg)](https://packagist.org/packages/alesima/laravel-azure-service-bus)
+[![License](https://img.shields.io/packagist/l/alesima/laravel-azure-service-bus.svg)](LICENSE)
+
 Integrate **Azure Service Bus** as a Laravel queue driver, with support for queues and topics/subscriptions (Pub/Sub). Ships its own lightweight **Service Bus REST client** (SAS auth) — no abandoned SDK required.
 
 ## Requirements

@@ -2,20 +2,17 @@
 
 namespace Alesima\LaravelAzureServiceBus\Drivers;
 
-use DateInterval;
-use DateTime;
-use DateTimeZone;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\IncomingMessage;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
-use WindowsAzure\ServiceBus\Models\BrokeredMessage;
 
 class AzureJob extends Job implements JobContract
 {
-    protected IServiceBus $azure;
+    protected ServiceBusClient $client;
 
-    protected BrokeredMessage $job;
+    protected IncomingMessage $job;
 
     /** @var string Matches parent signature (untyped in illuminate <= 8). */
     protected $queue;
@@ -24,13 +21,13 @@ class AzureJob extends Job implements JobContract
 
     public function __construct(
         Container $container,
-        IServiceBus $azure,
-        BrokeredMessage $job,
+        ServiceBusClient $client,
+        IncomingMessage $job,
         string $queue,
         string $rawMessage
     ) {
         $this->container = $container;
-        $this->azure = $azure;
+        $this->client = $client;
         $this->job = $job;
         $this->queue = $queue;
         $this->rawMessage = $rawMessage;
@@ -38,7 +35,7 @@ class AzureJob extends Job implements JobContract
 
     public function delete(): void
     {
-        $this->azure->deleteMessage($this->job);
+        $this->client->deleteMessage($this->job);
         parent::delete();
     }
 
@@ -52,25 +49,18 @@ class AzureJob extends Job implements JobContract
     public function release($delay = 0): void
     {
         parent::release($delay);
-
-        if (is_int($delay) && $delay > 0) {
-            $releaseTime = new DateTime('now', new DateTimeZone('UTC'));
-            $releaseTime->add(new DateInterval('PT' . $delay . 'S'));
-            $this->job->setScheduledEnqueueTimeUtc($releaseTime);
-        }
-
-        $this->azure->unlockMessage($this->job);
+        $this->client->unlockMessage($this->job);
     }
 
     public function attempts(): int
     {
-        return (int) $this->job->getDeliveryCount();
+        return $this->job->getDeliveryCount();
     }
 
     // NOTE: failed-job cleanup goes through fail() -> delete(), same as
     // Illuminate\Queue\Jobs\SqsJob. No failed() override on purpose: the
-    // parent signature differs between illuminate 8 (protected, untyped)
-    // and 10/11 (typed), so overriding it breaks one side or the other.
+    // parent signature differs between illuminate versions, so overriding
+    // it breaks one side or the other.
 
     public function getJobId(): string
     {
@@ -87,12 +77,12 @@ class AzureJob extends Job implements JobContract
         return $this->container;
     }
 
-    public function getAzure(): IServiceBus
+    public function getClient(): ServiceBusClient
     {
-        return $this->azure;
+        return $this->client;
     }
 
-    public function getAzureJob(): BrokeredMessage
+    public function getMessage(): IncomingMessage
     {
         return $this->job;
     }

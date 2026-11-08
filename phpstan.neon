@@ -5,7 +5,6 @@ parameters:
         - tests
     excludePaths:
         - vendor
-    checkMissingIterableValueType: true
     checkExplicitMixed: true
     ignoreErrors:
         # $delay is mixed by design (DateTimeInterface|DateInterval|int);

@@ -3,6 +3,8 @@
 namespace Alesima\LaravelAzureServiceBus;
 
 use Alesima\LaravelAzureServiceBus\Drivers\AzureJob;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\OutgoingMessage;
 use DateTime;
 use DateTimeInterface;
 use DateTimeZone;
@@ -10,42 +12,25 @@ use DateInterval;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Queue\Queue;
 use InvalidArgumentException;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
-use WindowsAzure\ServiceBus\Models\BrokeredMessage;
-use WindowsAzure\ServiceBus\Models\ReceiveMessageOptions;
 
 /**
  * Laravel queue implementation for Azure Service Bus (queues).
  */
 class ServiceBus extends Queue implements QueueContract
 {
-    protected IServiceBus $azure;
+    protected ServiceBusClient $client;
 
     protected string $defaultQueue;
 
-    protected ReceiveMessageOptions $receiveOptions;
-
-    public function __construct(IServiceBus $azure, string $defaultQueue)
+    public function __construct(ServiceBusClient $client, string $defaultQueue)
     {
-        $this->azure = $azure;
+        $this->client = $client;
         $this->defaultQueue = $defaultQueue;
-        $this->initializeReceiveOptions();
     }
 
-    protected function initializeReceiveOptions(): void
+    public function getClient(): ServiceBusClient
     {
-        $this->receiveOptions = new ReceiveMessageOptions();
-        $this->receiveOptions->setPeekLock();
-    }
-
-    public function getAzure(): IServiceBus
-    {
-        return $this->azure;
-    }
-
-    public function getReceiveOptions(): ReceiveMessageOptions
-    {
-        return $this->receiveOptions;
+        return $this->client;
     }
 
     public function getDefaultQueue(): string
@@ -54,7 +39,7 @@ class ServiceBus extends Queue implements QueueContract
     }
 
     /**
-     * Azure Service Bus has no cheap count API on this SDK path.
+     * Azure Service Bus has no cheap count API on this driver.
      * Returns 0 to satisfy the contract without an extra HTTP call.
      */
     public function size($queue = null): int
@@ -77,8 +62,7 @@ class ServiceBus extends Queue implements QueueContract
     public function pushRaw($payload, $queue = null, array $options = [])
     {
         $queueName = $this->getQueueName($queue);
-        $message = new BrokeredMessage($payload);
-        $this->sendMessageToQueue($queueName, $message);
+        $this->client->sendQueueMessage($queueName, new OutgoingMessage((string) $payload));
 
         return null;
     }
@@ -89,10 +73,10 @@ class ServiceBus extends Queue implements QueueContract
         $queueName = $this->getQueueName($queue);
         $payload = $this->createPayload($job, $queueName, $data);
 
-        $message = new BrokeredMessage($payload);
-        $message->setScheduledEnqueueTimeUtc($scheduledTime);
-
-        $this->sendMessageToQueue($queueName, $message);
+        $this->client->sendQueueMessage(
+            $queueName,
+            new OutgoingMessage((string) $payload, $scheduledTime)
+        );
 
         return null;
     }
@@ -100,7 +84,7 @@ class ServiceBus extends Queue implements QueueContract
     public function pop($queue = null)
     {
         $queueName = $this->getQueueName($queue);
-        $message = $this->receiveMessageFromQueue($queueName);
+        $message = $this->client->receiveQueueMessage($queueName);
 
         if ($message === null) {
             return null;
@@ -108,21 +92,11 @@ class ServiceBus extends Queue implements QueueContract
 
         return new AzureJob(
             $this->container,
-            $this->azure,
+            $this->client,
             $message,
             $queueName,
-            (string) $message->getBody()
+            $message->getBody()
         );
-    }
-
-    protected function sendMessageToQueue(string $queue, BrokeredMessage $message): void
-    {
-        $this->azure->sendQueueMessage($queue, $message);
-    }
-
-    protected function receiveMessageFromQueue(string $queue): ?BrokeredMessage
-    {
-        return $this->azure->receiveQueueMessage($queue, $this->receiveOptions);
     }
 
     /**

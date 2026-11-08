@@ -3,20 +3,22 @@
 namespace Alesima\LaravelAzureServiceBus\Connectors;
 
 use Alesima\LaravelAzureServiceBus\Drivers\AzureQueue;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Rest\RestServiceBusClient;
 use Illuminate\Container\Container;
 use Illuminate\Queue\Connectors\ConnectorInterface;
 use InvalidArgumentException;
-use WindowsAzure\Common\ServicesBuilder;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
 
 class AzureConnector implements ConnectorInterface
 {
-    /** @var callable|null */
-    private $serviceBusFactory;
+    /**
+     * @var callable(string, string, string, int): ServiceBusClient|null
+     */
+    private $clientFactory;
 
-    public function __construct(?callable $serviceBusFactory = null)
+    public function __construct(?callable $clientFactory = null)
     {
-        $this->serviceBusFactory = $serviceBusFactory;
+        $this->clientFactory = $clientFactory;
     }
 
     /**
@@ -34,38 +36,25 @@ class AzureConnector implements ConnectorInterface
         $key = $config['shared_access_key'];
         /** @var string $queueName */
         $queueName = $config['queue'];
+        /** @var int $timeout */
+        $timeout = $config['timeout'] ?? 20;
 
-        $connectionString = self::buildConnectionString($endpoint, $keyName, $key);
+        $client = $this->createClient($endpoint, $keyName, $key, $timeout);
+        $queue = new AzureQueue($client, $queueName);
+        $queue->setContainer(Container::getInstance());
 
-        $serviceBus = $this->createServiceBus($connectionString);
-        $azureQueue = new AzureQueue($serviceBus, $queueName);
-        $azureQueue->setContainer(Container::getInstance());
-
-        return $azureQueue;
+        return $queue;
     }
 
-    public static function buildConnectionString(
-        string $endpoint,
-        string $keyName,
-        string $key
-    ): string {
-        return sprintf(
-            'Endpoint=%s;SharedAccessKeyName=%s;SharedAccessKey=%s',
-            rtrim($endpoint, ';'),
-            $keyName,
-            $key
-        );
-    }
-
-    private function createServiceBus(string $connectionString): IServiceBus
+    private function createClient(string $endpoint, string $keyName, string $key, int $timeout): ServiceBusClient
     {
-        if ($this->serviceBusFactory !== null) {
-            $factory = $this->serviceBusFactory;
+        if ($this->clientFactory !== null) {
+            $factory = $this->clientFactory;
 
-            return $factory($connectionString);
+            return $factory($endpoint, $keyName, $key, $timeout);
         }
 
-        return ServicesBuilder::getInstance()->createServiceBusService($connectionString);
+        return new RestServiceBusClient($endpoint, $keyName, $key, null, $timeout);
     }
 
     /**
@@ -79,6 +68,15 @@ class AzureConnector implements ConnectorInterface
                     "Azure Service Bus config missing or invalid: '{$key}' is required."
                 );
             }
+        }
+
+        if (
+            isset($config['timeout'])
+            && (! is_int($config['timeout']) || $config['timeout'] < 0 || $config['timeout'] > 60)
+        ) {
+            throw new InvalidArgumentException(
+                'Azure Service Bus config missing or invalid: \'timeout\' must be an int between 0 and 60.'
+            );
         }
     }
 }

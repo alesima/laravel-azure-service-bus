@@ -16,4 +16,11 @@ return [
     'shared_access_key' => env('SERVICE_BUS_SHARED_ACCESS_KEY'),
 
     'queue' => env('SERVICE_BUS_QUEUE', 'default'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Receive long-poll timeout (seconds, 0-60)
+    |--------------------------------------------------------------------------
+    */
+    'timeout' => (int) env('SERVICE_BUS_TIMEOUT', 20),
 ];

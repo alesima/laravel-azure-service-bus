@@ -26,7 +26,7 @@ class ServiceProviderTest extends TestCase
         // needs phpoption/phpoption (absent in some lock files).
         $contents = (string) file_get_contents($path);
 
-        foreach (['endpoint', 'shared_access_key_name', 'shared_access_key', 'queue'] as $key) {
+        foreach (['endpoint', 'shared_access_key_name', 'shared_access_key', 'queue', 'timeout'] as $key) {
             $this->assertStringContainsString("'{$key}'", $contents, "config missing key: {$key}");
         }
     }

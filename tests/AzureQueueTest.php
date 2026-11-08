@@ -4,35 +4,37 @@ namespace Alesima\LaravelAzureServiceBus\Tests;
 
 use Alesima\LaravelAzureServiceBus\Drivers\AzureJob;
 use Alesima\LaravelAzureServiceBus\Drivers\AzureQueue;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\IncomingMessage;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\OutgoingMessage;
 use Illuminate\Container\Container;
 use PHPUnit\Framework\TestCase;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
-use WindowsAzure\ServiceBus\Models\BrokeredMessage;
 
 class AzureQueueTest extends TestCase
 {
     private AzureQueue $queue;
 
-    /** @var \PHPUnit\Framework\MockObject\MockObject&\WindowsAzure\ServiceBus\Internal\IServiceBus */
-    private $mockServiceBus;
+    /** @var \PHPUnit\Framework\MockObject\MockObject&ServiceBusClient */
+    private $mockClient;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->mockServiceBus = $this->createMock(IServiceBus::class);
-        $this->queue = new AzureQueue($this->mockServiceBus, 'testQueue');
+        $this->mockClient = $this->createMock(ServiceBusClient::class);
+        $this->queue = new AzureQueue($this->mockClient, 'testQueue');
         $this->queue->setContainer(new Container());
     }
 
     public function testPushRaw(): void
     {
-        $this->mockServiceBus->expects($this->once())
+        $this->mockClient->expects($this->once())
             ->method('sendQueueMessage')
             ->with(
                 $this->equalTo('testQueue'),
-                $this->callback(function (BrokeredMessage $message) {
-                    return $message->getBody() === 'testPayload';
+                $this->callback(function (OutgoingMessage $message): bool {
+                    return $message->getBody() === 'testPayload'
+                        && $message->getScheduledEnqueueTimeUtc() === null;
                 })
             );
 
@@ -41,13 +43,15 @@ class AzureQueueTest extends TestCase
 
     public function testPushRawWithSpecificQueue(): void
     {
-        $this->mockServiceBus->expects($this->once())
+        $this->mockClient->expects($this->once())
             ->method('sendQueueMessage')
             ->with(
                 $this->equalTo('specificQueue'),
-                $this->callback(function (BrokeredMessage $message) {
-                    return $message->getBody() === 'testPayload';
-                })
+                $this->callback(
+                    function (OutgoingMessage $message): bool {
+                        return $message->getBody() === 'testPayload';
+                    }
+                )
             );
 
         $this->queue->pushRaw('testPayload', 'specificQueue');
@@ -55,13 +59,10 @@ class AzureQueueTest extends TestCase
 
     public function testPop(): void
     {
-        $mockMessage = $this->createMock(BrokeredMessage::class);
-        $mockMessage->method('getBody')->willReturn('{"job":"TestJob"}');
-
-        $this->mockServiceBus->expects($this->once())
+        $this->mockClient->expects($this->once())
             ->method('receiveQueueMessage')
             ->with($this->equalTo('testQueue'))
-            ->willReturn($mockMessage);
+            ->willReturn(new IncomingMessage('{"job":"TestJob"}', 'id-1', 1, 'lock'));
 
         $job = $this->queue->pop();
 
@@ -72,23 +73,27 @@ class AzureQueueTest extends TestCase
 
     public function testPopReturnsNullWhenNoMessage(): void
     {
-        $this->mockServiceBus->expects($this->once())
+        $this->mockClient->expects($this->once())
             ->method('receiveQueueMessage')
             ->willReturn(null);
 
         $this->assertNull($this->queue->pop());
     }
 
-    public function testLaterWithSeconds(): void
+    public function testLater(): void
     {
-        $this->mockServiceBus->expects($this->once())
+        $before = time();
+
+        $this->mockClient->expects($this->once())
             ->method('sendQueueMessage')
             ->with(
                 $this->equalTo('testQueue'),
-                $this->callback(function (BrokeredMessage $message) {
+                $this->callback(function (OutgoingMessage $message) use ($before): bool {
                     $scheduled = $message->getScheduledEnqueueTimeUtc();
 
-                    return $scheduled instanceof \DateTime && $scheduled > new \DateTime();
+                    return $scheduled !== null
+                        && $scheduled->getTimestamp() >= $before + 59
+                        && $scheduled->getTimestamp() <= $before + 61;
                 })
             );
 

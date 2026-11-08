@@ -3,18 +3,17 @@
 namespace Alesima\LaravelAzureServiceBus\Tests;
 
 use Alesima\LaravelAzureServiceBus\Drivers\AzureJob;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\IncomingMessage;
 use Illuminate\Container\Container;
 use PHPUnit\Framework\TestCase;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
-use WindowsAzure\ServiceBus\Models\BrokeredMessage;
 
 class AzureJobTest extends TestCase
 {
-    /** @var \PHPUnit\Framework\MockObject\MockObject&\WindowsAzure\ServiceBus\Models\BrokeredMessage */
-    private $mockMessage;
+    private IncomingMessage $message;
 
-    /** @var \PHPUnit\Framework\MockObject\MockObject&\WindowsAzure\ServiceBus\Internal\IServiceBus */
-    private $mockServiceBus;
+    /** @var \PHPUnit\Framework\MockObject\MockObject&ServiceBusClient */
+    private $mockClient;
 
     private Container $container;
 
@@ -24,14 +23,14 @@ class AzureJobTest extends TestCase
     {
         parent::setUp();
 
-        $this->mockMessage = $this->createMock(BrokeredMessage::class);
-        $this->mockServiceBus = $this->createMock(IServiceBus::class);
+        $this->message = new IncomingMessage('{"job":"TestJob"}', 'id-7', 3, 'lock-location');
+        $this->mockClient = $this->createMock(ServiceBusClient::class);
         $this->container = new Container();
 
         $this->job = new AzureJob(
             $this->container,
-            $this->mockServiceBus,
-            $this->mockMessage,
+            $this->mockClient,
+            $this->message,
             'testQueue',
             '{"job":"TestJob"}'
         );
@@ -39,12 +38,12 @@ class AzureJobTest extends TestCase
 
     public function testDeleteDeletesMessageBeforeMarkingDeleted(): void
     {
-        $serviceBus = $this->createMock(IServiceBus::class);
-        $message = $this->createMock(BrokeredMessage::class);
+        $client = $this->createMock(ServiceBusClient::class);
+        $message = new IncomingMessage('body', 'id-1', 1, 'lock');
 
-        $serviceBus->expects($this->once())->method('deleteMessage')->with($message);
+        $client->expects($this->once())->method('deleteMessage')->with($message);
 
-        $job = new AzureJob(new Container(), $serviceBus, $message, 'q', 'body');
+        $job = new AzureJob(new Container(), $client, $message, 'q', 'body');
         $job->delete();
 
         $this->assertTrue($job->isDeleted());
@@ -52,34 +51,36 @@ class AzureJobTest extends TestCase
 
     public function testReleaseUnlocksMessage(): void
     {
-        $this->mockServiceBus->expects($this->once())
+        $this->mockClient->expects($this->once())
             ->method('unlockMessage')
-            ->with($this->mockMessage);
+            ->with($this->message);
 
         $this->job->release();
 
         $this->assertTrue($this->job->isReleased());
     }
 
-    public function testAttemptsCastsNullToZero(): void
-    {
-        $this->mockMessage->method('getDeliveryCount')->willReturn(null);
-
-        $this->assertSame(0, $this->job->attempts());
-    }
-
     public function testAttemptsReturnsDeliveryCount(): void
     {
-        $this->mockMessage->method('getDeliveryCount')->willReturn(3);
-
         $this->assertSame(3, $this->job->attempts());
+    }
+
+    public function testGetJobIdReturnsMessageId(): void
+    {
+        $this->assertSame('id-7', $this->job->getJobId());
     }
 
     public function testGetJobIdFallsBackToEmptyString(): void
     {
-        $this->mockMessage->method('getMessageId')->willReturn(null);
+        $job = new AzureJob(
+            $this->container,
+            $this->mockClient,
+            new IncomingMessage('body', null, 0, null),
+            'q',
+            'body'
+        );
 
-        $this->assertSame('', $this->job->getJobId());
+        $this->assertSame('', $job->getJobId());
     }
 
     public function testGetRawBody(): void
@@ -90,5 +91,10 @@ class AzureJobTest extends TestCase
     public function testGetQueue(): void
     {
         $this->assertSame('testQueue', $this->job->getQueue());
+    }
+
+    public function testGetMessage(): void
+    {
+        $this->assertSame($this->message, $this->job->getMessage());
     }
 }

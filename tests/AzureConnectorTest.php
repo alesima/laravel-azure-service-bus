@@ -4,36 +4,34 @@ namespace Alesima\LaravelAzureServiceBus\Tests;
 
 use Alesima\LaravelAzureServiceBus\Connectors\AzureConnector;
 use Alesima\LaravelAzureServiceBus\Drivers\AzureQueue;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Rest\RestServiceBusClient;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
 
 class AzureConnectorTest extends TestCase
 {
-    public function testBuildConnectionString(): void
+    public function testConnectBuildsClientFromConfig(): void
     {
-        $result = AzureConnector::buildConnectionString(
-            'https://example.servicebus.windows.net',
-            'testKeyName',
-            'testKey'
+        $captured = [];
+        $mockClient = $this->createMock(ServiceBusClient::class);
+
+        $connector = new AzureConnector(
+            function (
+                string $endpoint,
+                string $keyName,
+                string $key,
+                int $timeout
+            ) use (
+                &$captured,
+                $mockClient
+            ): ServiceBusClient {
+                $captured = [$endpoint, $keyName, $key, $timeout];
+
+                return $mockClient;
+            }
         );
-
-        $this->assertSame(
-            'Endpoint=https://example.servicebus.windows.net;SharedAccessKeyName=testKeyName;SharedAccessKey=testKey',
-            $result
-        );
-    }
-
-    public function testConnectReturnsAzureQueue(): void
-    {
-        $captured = null;
-        $mockServiceBus = $this->createMock(IServiceBus::class);
-
-        $connector = new AzureConnector(function (string $connectionString) use (&$captured, $mockServiceBus) {
-            $captured = $connectionString;
-
-            return $mockServiceBus;
-        });
 
         $queue = $connector->connect([
             'endpoint' => 'https://example.servicebus.windows.net',
@@ -44,16 +42,29 @@ class AzureConnectorTest extends TestCase
 
         $this->assertInstanceOf(AzureQueue::class, $queue);
         $this->assertSame(
-            'Endpoint=https://example.servicebus.windows.net;SharedAccessKeyName=testKeyName;SharedAccessKey=testKey',
+            ['https://example.servicebus.windows.net', 'testKeyName', 'testKey', 20],
             $captured
         );
         $this->assertSame('testQueue', $queue->getDefaultQueue());
     }
 
+    public function testConnectWithoutFactoryBuildsRestClient(): void
+    {
+        $queue = (new AzureConnector())->connect([
+            'endpoint' => 'https://example.servicebus.windows.net',
+            'shared_access_key_name' => 'testKeyName',
+            'shared_access_key' => 'testKey',
+            'queue' => 'testQueue',
+        ]);
+
+        $this->assertInstanceOf(AzureQueue::class, $queue);
+        $this->assertInstanceOf(RestServiceBusClient::class, $queue->getClient());
+    }
+
     /**
-     * @param array<string,string> $config
-     * @dataProvider missingConfigProvider
+     * @param array<string,mixed> $config
      */
+    #[DataProvider('invalidConfigProvider')]
     public function testConnectThrowsOnInvalidConfig(array $config): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -62,9 +73,9 @@ class AzureConnectorTest extends TestCase
     }
 
     /**
-     * @return array<string,array<int,array<string,string>>>
+     * @return array<string,array<int,array<string,mixed>>>
      */
-    public static function missingConfigProvider(): array
+    public static function invalidConfigProvider(): array
     {
         $valid = [
             'endpoint' => 'https://example.servicebus.windows.net',
@@ -83,6 +94,14 @@ class AzureConnectorTest extends TestCase
         $empty = $valid;
         $empty['queue'] = '';
         $cases['empty queue'] = [$empty];
+
+        $badTimeout = $valid;
+        $badTimeout['timeout'] = 61;
+        $cases['timeout out of range'] = [$badTimeout];
+
+        $stringTimeout = $valid;
+        $stringTimeout['timeout'] = '20';
+        $cases['non-int timeout'] = [$stringTimeout];
 
         return $cases;
     }

@@ -3,212 +3,143 @@
 namespace Alesima\LaravelAzureServiceBus;
 
 use Alesima\LaravelAzureServiceBus\Drivers\AzureJob;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\OutgoingMessage;
 use DateTime;
 use DateTimeInterface;
+use DateTimeZone;
 use DateInterval;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Queue\Queue;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
-use WindowsAzure\ServiceBus\Models\BrokeredMessage;
-use WindowsAzure\ServiceBus\Models\ReceiveMessageOptions;
+use InvalidArgumentException;
 
 /**
- * Class ServiceBus
- *
- * A Laravel queue implementation for Azure Service Bus.
+ * Laravel queue implementation for Azure Service Bus (queues).
  */
 class ServiceBus extends Queue implements QueueContract
 {
-    /**
-     * Azure Service Bus instance.
-     *
-     * @var IServiceBus
-     */
-    protected $azure;
+    protected ServiceBusClient $client;
 
-    /**
-     * Default queue name.
-     *
-     * @var string
-     */
-    protected $defaultQueue;
+    protected string $defaultQueue;
 
-    /**
-     * Options for receiving messages (PeekAndLock).
-     *
-     * @var ReceiveMessageOptions
-     */
-    protected $receiveOptions;
-
-    /**
-     * ServiceBus constructor.
-     *
-     * @param IServiceBus $azure Azure Service Bus instance.
-     * @param string $defaultQueue Default queue name.
-     */
-    public function __construct(IServiceBus $azure, string $defaultQueue)
+    public function __construct(ServiceBusClient $client, string $defaultQueue)
     {
-        $this->azure = $azure;
+        $this->client = $client;
         $this->defaultQueue = $defaultQueue;
-        $this->initializeReceiveOptions();
     }
 
-    /**
-     * Initialize receive options with PeekAndLock.
-     *
-     * @return void
-     */
-    private function initializeReceiveOptions(): void
+    public function getClient(): ServiceBusClient
     {
-        $this->receiveOptions = new ReceiveMessageOptions();
-        $this->receiveOptions->setPeekLock();
+        return $this->client;
+    }
+
+    public function getDefaultQueue(): string
+    {
+        return $this->defaultQueue;
     }
 
     /**
-     * Get the size of the queue.
-     *
-     * @param string|null $queue Queue name (optional).
-     * @return int Always returns 0 (not supported by Azure Service Bus).
+     * Azure Service Bus has no cheap count API on this driver.
+     * Returns 0 to satisfy the contract without an extra HTTP call.
      */
     public function size($queue = null): int
     {
-        return 0; // Azure Service Bus doesn't support retrieving queue size
+        return 0;
     }
 
-    /**
-     * Push a new job onto the queue.
-     *
-     * @param mixed $job The job instance or class name.
-     * @param mixed $data The payload for the job.
-     * @param string|null $queue Queue name (optional).
-     * @return void
-     * @throws \Exception If sending the message fails.
-     */
-    public function push($job, $data = '', $queue = null): void
+    public function push($job, $data = '', $queue = null)
     {
-        $payload = $this->createPayload($job, $data);
-        $this->pushRaw($payload, $queue);
+        $queueName = $this->getQueueName($queue);
+        $payload = $this->createPayload($job, $queueName, $data);
+        $this->pushRaw($payload, $queueName);
+
+        return null;
     }
 
     /**
-     * Push a raw payload onto the queue.
-     *
-     * @param string $payload Raw job payload.
-     * @param string|null $queue Queue name (optional).
-     * @param array $options Additional options (ignored).
-     * @return void
-     * @throws \Exception If sending the message fails.
+     * @param array<string,mixed> $options
      */
-    public function pushRaw($payload, $queue = null, array $options = []): void
+    public function pushRaw($payload, $queue = null, array $options = [])
     {
-        $queue = $this->getQueueName($queue);
-        $message = new BrokeredMessage($payload);
-        $this->sendMessageToQueue($queue, $message);
+        $queueName = $this->getQueueName($queue);
+        $this->client->sendQueueMessage($queueName, new OutgoingMessage((string) $payload));
+
+        return null;
     }
 
-    /**
-     * Push a job onto the queue to be processed later.
-     *
-     * @param DateTimeInterface|DateInterval|int $delay Delay before processing.
-     * @param mixed $job The job instance or class name.
-     * @param mixed $data The payload for the job.
-     * @param string|null $queue Queue name (optional).
-     * @return void
-     * @throws \Exception If sending the delayed message fails.
-     */
-    public function later($delay, $job, $data = '', $queue = null): void
+    public function later($delay, $job, $data = '', $queue = null)
     {
         $scheduledTime = $this->resolveDelayToDateTime($delay);
-        $payload = $this->createPayload($job, $data);
+        $queueName = $this->getQueueName($queue);
+        $payload = $this->createPayload($job, $queueName, $data);
 
-        $message = new BrokeredMessage($payload);
-        $message->setScheduledEnqueueTimeUtc($scheduledTime);
+        $this->client->sendQueueMessage(
+            $queueName,
+            new OutgoingMessage((string) $payload, $scheduledTime)
+        );
 
-        $queue = $this->getQueueName($queue);
-        $this->sendMessageToQueue($queue, $message);
+        return null;
     }
 
-    /**
-     * Pop the next job off the queue.
-     *
-     * @param string|null $queue Queue name (optional).
-     * @return AzureJob|null A queued job instance or null if none available.
-     * @throws \Exception If receiving the message fails.
-     */
     public function pop($queue = null)
     {
-        $queue = $this->getQueueName($queue);
-        $message = $this->receiveMessageFromQueue($queue);
+        $queueName = $this->getQueueName($queue);
+        $message = $this->client->receiveQueueMessage($queueName);
 
-        if (!$message) {
+        if ($message === null) {
             return null;
         }
 
-        return new AzureJob($this->container, $this->azure, $message, $queue, $message->getBody());
+        return new AzureJob(
+            $this->container,
+            $this->client,
+            $message,
+            $queueName,
+            $message->getBody()
+        );
     }
 
     /**
-     * Send a message to a queue.
-     *
-     * @param string $queue Queue name.
-     * @param BrokeredMessage $message The message to send.
-     * @return void
-     * @throws \Exception If sending the message fails.
-     */
-    protected function sendMessageToQueue(string $queue, BrokeredMessage $message): void
-    {
-        $this->azure->sendQueueMessage($queue, $message);
-    }
-
-    /**
-     * Receive a message from a queue.
-     *
-     * @param string $queue Queue name.
-     * @return BrokeredMessage|null The received message or null if none.
-     * @throws \Exception If receiving the message fails.
-     */
-    protected function receiveMessageFromQueue(string $queue): ?BrokeredMessage
-    {
-        return $this->azure->receiveQueueMessage($queue, $this->receiveOptions);
-    }
-
-    /**
-     * Resolve a delay to a DateTime instance.
-     *
-     * @param DateTimeInterface|DateInterval|int $delay The delay.
-     * @return DateTime A DateTime in UTC.
-     * @throws \InvalidArgumentException If the delay type is invalid.
+     * @param DateTimeInterface|DateInterval|int $delay
      */
     protected function resolveDelayToDateTime($delay): DateTime
     {
         if ($delay instanceof DateTimeInterface) {
-            $dateTime = new DateTime();
+            $dateTime = new DateTime('now', new DateTimeZone('UTC'));
             $dateTime->setTimestamp($delay->getTimestamp());
-            $dateTime->setTimezone(new \DateTimeZone('UTC'));
+
             return $dateTime;
         }
 
         if ($delay instanceof DateInterval) {
-            $dateTime = new DateTime('now', new \DateTimeZone('UTC'));
-            return $dateTime->add($delay);
+            $dateTime = new DateTime('now', new DateTimeZone('UTC'));
+            $dateTime->add($delay);
+
+            return $dateTime;
         }
 
         if (is_int($delay)) {
-            $dateTime = new DateTime('now', new \DateTimeZone('UTC'));
-            return $dateTime->add(new DateInterval("PT{$delay}S"));
+            if ($delay < 0) {
+                throw new InvalidArgumentException('Delay in seconds must be >= 0.');
+            }
+
+            $dateTime = new DateTime('now', new DateTimeZone('UTC'));
+            $dateTime->add(new DateInterval("PT{$delay}S"));
+
+            return $dateTime;
         }
 
-        throw new \InvalidArgumentException('Invalid delay type. Must be DateTimeInterface, DateInterval, or int.');
+        throw new InvalidArgumentException(
+            'Invalid delay type. Must be DateTimeInterface, DateInterval, or int (seconds).'
+        );
     }
 
-    /**
-     * Get the resolved queue name.
-     *
-     * @param string|null $queue Queue name (optional).
-     * @return string Resolved queue name.
-     */
     protected function getQueueName(?string $queue): string
     {
-        return $queue ?: $this->defaultQueue;
+        if (! empty($queue)) {
+            return $queue;
+        }
+
+        return $this->defaultQueue;
     }
 }

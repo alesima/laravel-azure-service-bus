@@ -2,146 +2,91 @@
 
 namespace Alesima\LaravelAzureServiceBus\Drivers;
 
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\IncomingMessage;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
-use WindowsAzure\ServiceBus\Models\BrokeredMessage;
 
 class AzureJob extends Job implements JobContract
 {
-    /**
-     * The Azure IServiceBus instance.
-     *
-     * @var IServiceBus
-     */
-    protected $azure;
+    protected ServiceBusClient $client;
 
-    /**
-     * The Azure ServiceBus job instance.
-     *
-     * @var BrokeredMessage
-     */
-    protected $job;
+    protected IncomingMessage $job;
 
-    /**
-     * The queue that the job belongs to.
-     *
-     * @var string
-     */
+    /** @var string Matches parent signature (untyped in illuminate <= 8). */
     protected $queue;
 
-    /**
-     * The raw payload on the queue.
-     *
-     * @var string
-     */
-    protected $rawMessage;
+    protected string $rawMessage;
 
-    /**
-     * Create a new job instance.
-     *
-     * @param Container $container
-     * @param IServiceBus $azure
-     * @param BrokeredMessage $job
-     * @param string $queue
-     * @param string $rawMessage
-     */
     public function __construct(
         Container $container,
-        IServiceBus $azure,
-        BrokeredMessage $job,
+        ServiceBusClient $client,
+        IncomingMessage $job,
         string $queue,
         string $rawMessage
     ) {
         $this->container = $container;
-        $this->azure = $azure;
+        $this->client = $client;
         $this->job = $job;
         $this->queue = $queue;
         $this->rawMessage = $rawMessage;
     }
 
-    /**
-     * Delete the job from the queue.
-     *
-     * @throws \Exception
-     */
     public function delete(): void
     {
+        $this->client->deleteMessage($this->job);
         parent::delete();
-        $this->azure->deleteMessage($this->job);
     }
 
     /**
-     * Release the job back into the queue with an optional delay.
+     * Unlock the message. Note: Azure PeekLock unlock does not honor
+     * a server-side delay — the message becomes visible immediately.
+     * Callers needing a true delay should delete + re-push with later().
      *
-     * @param int $delay Delay in seconds before the job is available.
-     * @throws \Exception
+     * @param int $delay Ignored by the Service Bus REST API on unlock; kept for contract compat.
      */
     public function release($delay = 0): void
     {
-        $releaseTime = (new \DateTime('now', new \DateTimeZone('UTC')))
-            ->add(new \DateInterval('PT' . $delay . 'S'));
-
-        $this->job->setScheduledEnqueueTimeUtc($releaseTime);
-        $this->azure->unlockMessage($this->job);
+        parent::release($delay);
+        $this->client->unlockMessage($this->job);
     }
 
-    /**
-     * Get the number of times the job has been attempted.
-     *
-     * @return int
-     */
     public function attempts(): int
     {
         return $this->job->getDeliveryCount();
     }
 
-    /**
-     * Get the job identifier.
-     *
-     * @return string
-     */
+    // NOTE: failed-job cleanup goes through fail() -> delete(), same as
+    // Illuminate\Queue\Jobs\SqsJob. No failed() override on purpose: the
+    // parent signature differs between illuminate versions, so overriding
+    // it breaks one side or the other.
+
     public function getJobId(): string
     {
-        return $this->job->getMessageId();
+        return (string) $this->job->getMessageId();
     }
 
-    /**
-     * Get the IoC container instance.
-     *
-     * @return Container
-     */
+    public function getQueue(): string
+    {
+        return $this->queue;
+    }
+
     public function getContainer(): Container
     {
         return $this->container;
     }
 
-    /**
-     * Get the underlying Azure client instance.
-     *
-     * @return IServiceBus
-     */
-    public function getAzure(): IServiceBus
+    public function getClient(): ServiceBusClient
     {
-        return $this->azure;
+        return $this->client;
     }
 
-    /**
-     * Get the underlying raw Azure job.
-     *
-     * @return BrokeredMessage
-     */
-    public function getAzureJob(): BrokeredMessage
+    public function getMessage(): IncomingMessage
     {
         return $this->job;
     }
 
-    /**
-     * Get the raw body string for the job.
-     *
-     * @return string
-     */
     public function getRawBody(): string
     {
         return $this->rawMessage;

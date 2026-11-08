@@ -3,81 +3,73 @@
 namespace Alesima\LaravelAzureServiceBus\Drivers;
 
 use Alesima\LaravelAzureServiceBus\ServiceBus;
-use WindowsAzure\ServiceBus\Models\BrokeredMessage;
-use WindowsAzure\ServiceBus\Models\SubscriptionInfo;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\IncomingMessage;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\OutgoingMessage;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Rest\ServiceBusException;
+use InvalidArgumentException;
+use Throwable;
 
 /**
- * Class AzureTopic
- *
- * Extends ServiceBus for Azure Service Bus topics.
+ * Topic / subscription (Pub/Sub) driver on top of ServiceBus.
  */
 class AzureTopic extends ServiceBus
 {
     /**
-     * Publish a message to a topic.
-     *
-     * @param string $topic Topic name.
-     * @param string|array $payload Message payload.
-     * @return void
-     * @throws \Exception If sending the message fails.
+     * @param mixed $payload String body or array (JSON-encoded).
      */
     public function publish(string $topic, $payload): void
     {
-        $message = new BrokeredMessage(is_array($payload) ? json_encode($payload) : $payload);
-        $this->sendMessageToTopic($topic, $message);
+        if (is_array($payload)) {
+            try {
+                $payload = json_encode($payload, JSON_THROW_ON_ERROR);
+            } catch (Throwable $e) {
+                throw new InvalidArgumentException(
+                    'Topic payload is not JSON serializable: ' . $e->getMessage(),
+                    0,
+                    $e
+                );
+            }
+        }
+
+        if (! is_string($payload)) {
+            throw new InvalidArgumentException('Topic payload must be a string or an array.');
+        }
+
+        if (trim($topic) === '') {
+            throw new InvalidArgumentException('Topic name must not be empty.');
+        }
+
+        $this->client->sendTopicMessage($topic, new OutgoingMessage($payload));
     }
 
-    /**
-     * Subscribe to a topic subscription and receive a message.
-     *
-     * @param string $topic Topic name.
-     * @param string $subscription Subscription name.
-     * @return BrokeredMessage|null Received message or null if none.
-     * @throws \Exception If receiving the message fails.
-     */
-    public function subscribe(string $topic, string $subscription): ?BrokeredMessage
+    public function subscribe(string $topic, string $subscription): ?IncomingMessage
     {
+        if (trim($topic) === '' || trim($subscription) === '') {
+            throw new InvalidArgumentException('Topic and subscription names must not be empty.');
+        }
+
         $this->ensureSubscriptionExists($topic, $subscription);
-        return $this->receiveMessageFromSubscription($topic, $subscription);
+
+        return $this->client->receiveSubscriptionMessage($topic, $subscription);
     }
 
-    /**
-     * Send a message to a topic.
-     *
-     * @param string $topic Topic name.
-     * @param BrokeredMessage $message The message to send.
-     * @return void
-     * @throws \Exception If sending the message fails.
-     */
-    protected function sendMessageToTopic(string $topic, BrokeredMessage $message): void
-    {
-        $this->azure->sendTopicMessage($topic, $message);
-    }
-
-    /**
-     * Receive a message from a topic subscription.
-     *
-     * @param string $topic Topic name.
-     * @param string $subscription Subscription name.
-     * @return BrokeredMessage|null The received message or null if none.
-     * @throws \Exception If receiving the message fails.
-     */
-    protected function receiveMessageFromSubscription(string $topic, string $subscription): ?BrokeredMessage
-    {
-        return $this->azure->receiveSubscriptionMessage($topic, $subscription, $this->receiveOptions);
-    }
-
-    /**
-     * Ensure that a subscription exists for a topic.
-     *
-     * @param string $topic Topic name.
-     * @param string $subscription Subscription name.
-     * @return void
-     * @throws \Exception If creating the subscription fails.
-     */
     protected function ensureSubscriptionExists(string $topic, string $subscription): void
     {
-        $subscriptionInfo = new SubscriptionInfo($subscription);
-        $this->azure->createSubscription($topic, $subscriptionInfo);
+        if (trim($topic) === '' || trim($subscription) === '') {
+            throw new InvalidArgumentException('Topic and subscription names must not be empty.');
+        }
+
+        if ($this->client->subscriptionExists($topic, $subscription)) {
+            return;
+        }
+
+        try {
+            $this->client->createSubscription($topic, $subscription);
+        } catch (ServiceBusException $e) {
+            if ($e->getStatusCode() !== 409) {
+                throw $e;
+            }
+            // 409: another worker created it between the check and the PUT.
+        }
     }
 }

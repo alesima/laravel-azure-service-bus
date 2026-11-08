@@ -3,116 +3,139 @@
 namespace Alesima\LaravelAzureServiceBus\Tests;
 
 use Alesima\LaravelAzureServiceBus\Drivers\AzureTopic;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Contracts\ServiceBusClient;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\IncomingMessage;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Models\OutgoingMessage;
+use Alesima\LaravelAzureServiceBus\ServiceBus\ReceiveMode;
+use Alesima\LaravelAzureServiceBus\ServiceBus\Rest\ServiceBusException;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
-use WindowsAzure\ServiceBus\Internal\IServiceBus;
-use PHPUnit\Framework\MockObject\MockObject;
-use WindowsAzure\ServiceBus\Models\BrokeredMessage;
-use WindowsAzure\ServiceBus\Models\ReceiveMessageOptions;
 
 class AzureTopicTest extends TestCase
 {
-    /**
-     * Instance of AzureTopic.
-     *
-     * @var AzureTopic
-     */
-    protected $topic;
+    private AzureTopic $topic;
 
-    /**
-     * Mock for IServiceBus.
-     *
-     * @var IServiceBus&MockObject
-     */
-    protected $mockServiceBus;
+    /** @var \PHPUnit\Framework\MockObject\MockObject&ServiceBusClient */
+    private $mockClient;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Create a mock for IServiceBus
-        $this->mockServiceBus = $this->createMock(IServiceBus::class);
-
-        // Create the AzureTopic instance with the mock
-        $this->topic = new AzureTopic($this->mockServiceBus, 'testSubscription');
+        $this->mockClient = $this->createMock(ServiceBusClient::class);
+        $this->topic = new AzureTopic($this->mockClient, 'defaultQueue');
     }
 
-    /**
-     * Test that a message is published to the correct topic.
-     */
-    public function testPublishMessage(): void
+    public function testPublishArrayPayloadAsJson(): void
     {
         $payload = ['data' => 'test'];
 
-        $this->mockServiceBus->expects($this->once())
+        $this->mockClient->expects($this->once())
             ->method('sendTopicMessage')
             ->with(
-                $this->equalTo('testTopic'), // Verify the topic name
-                $this->callback(function (BrokeredMessage $message) use ($payload) {
+                $this->equalTo('testTopic'),
+                $this->callback(function (OutgoingMessage $message) use ($payload): bool {
                     return $message->getBody() === json_encode($payload);
-                }) // Verify the payload content
+                })
             );
 
         $this->topic->publish('testTopic', $payload);
     }
 
-    /**
-     * Test subscribing to a topic and retrieving a message.
-     */
-    public function testSubscribeMessage(): void
-    {
-        $mockMessage = $this->createMock(BrokeredMessage::class);
-        $mockMessage->method('getBody')->willReturn('{"event":"user.created"}');
-
-        $this->mockServiceBus->expects($this->once())
-            ->method('receiveSubscriptionMessage')
-            ->with(
-                $this->equalTo('testTopic'),
-                $this->equalTo('testSubscription'),
-                $this->isInstanceOf(ReceiveMessageOptions::class)
-            )
-            ->willReturn($mockMessage);
-
-        $message = $this->topic->subscribe('testTopic', 'testSubscription');
-
-        $this->assertInstanceOf(BrokeredMessage::class, $message);
-        $this->assertEquals('{"event":"user.created"}', $message->getBody());
-    }
-
-    /**
-     * Test subscribing when no message is available.
-     */
-    public function testSubscribeReturnsNullWhenNoMessage(): void
-    {
-        $this->mockServiceBus->expects($this->once())
-            ->method('receiveSubscriptionMessage')
-            ->with(
-                $this->equalTo('testTopic'),
-                $this->equalTo('testSubscription'),
-                $this->isInstanceOf(ReceiveMessageOptions::class)
-            )
-            ->willReturn(null);
-
-        $message = $this->topic->subscribe('testTopic', 'testSubscription');
-
-        $this->assertNull($message);
-    }
-
-    /**
-     * Test publishing with a raw string payload.
-     */
     public function testPublishRawStringMessage(): void
     {
         $payload = 'Simple string message';
 
-        $this->mockServiceBus->expects($this->once())
+        $this->mockClient->expects($this->once())
             ->method('sendTopicMessage')
             ->with(
                 $this->equalTo('testTopic'),
-                $this->callback(function (BrokeredMessage $message) use ($payload) {
+                $this->callback(function (OutgoingMessage $message) use ($payload): bool {
                     return $message->getBody() === $payload;
                 })
             );
 
         $this->topic->publish('testTopic', $payload);
+    }
+
+    public function testPublishRejectsNonArrayNonStringPayload(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->topic->publish('testTopic', 123);
+    }
+
+    public function testPublishRejectsEmptyTopic(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->topic->publish('', 'body');
+    }
+
+    public function testSubscribeRetrievesMessageWhenSubscriptionExists(): void
+    {
+        $message = new IncomingMessage('{"event":"user.created"}', 'id-1', 1, 'lock');
+
+        $this->mockClient->method('subscriptionExists')->willReturn(true);
+        $this->mockClient->expects($this->never())->method('createSubscription');
+        $this->mockClient->expects($this->once())
+            ->method('receiveSubscriptionMessage')
+            ->with('testTopic', 'testSubscription', ReceiveMode::PeekLock)
+            ->willReturn($message);
+
+        $result = $this->topic->subscribe('testTopic', 'testSubscription');
+
+        $this->assertSame($message, $result);
+    }
+
+    public function testSubscribeCreatesMissingSubscription(): void
+    {
+        $message = new IncomingMessage('{"event":"user.created"}', 'id-1', 1, 'lock');
+
+        $this->mockClient->method('subscriptionExists')->willReturn(false);
+        $this->mockClient->expects($this->once())
+            ->method('createSubscription')
+            ->with('testTopic', 'testSubscription');
+        $this->mockClient->method('receiveSubscriptionMessage')->willReturn($message);
+
+        $this->assertSame($message, $this->topic->subscribe('testTopic', 'testSubscription'));
+    }
+
+    public function testSubscribeReturnsNullWhenNoMessage(): void
+    {
+        $this->mockClient->method('subscriptionExists')->willReturn(true);
+        $this->mockClient->method('receiveSubscriptionMessage')->willReturn(null);
+
+        $this->assertNull($this->topic->subscribe('testTopic', 'testSubscription'));
+    }
+
+    public function testSubscribeSwallowsAlreadyExistsConflict(): void
+    {
+        $message = new IncomingMessage('x', 'id-1', 1, 'lock');
+
+        $this->mockClient->method('subscriptionExists')->willReturn(false);
+        $this->mockClient->method('createSubscription')
+            ->willThrowException(new ServiceBusException('conflict', 409));
+        $this->mockClient->method('receiveSubscriptionMessage')->willReturn($message);
+
+        $this->assertSame($message, $this->topic->subscribe('testTopic', 'testSubscription'));
+    }
+
+    public function testSubscribeRethrowsRealErrors(): void
+    {
+        $this->mockClient->method('subscriptionExists')->willReturn(false);
+        $this->mockClient->method('createSubscription')
+            ->willThrowException(new ServiceBusException('boom', 500));
+
+        $this->expectException(ServiceBusException::class);
+
+        $this->topic->subscribe('testTopic', 'testSubscription');
+    }
+
+    public function testSubscribeRejectsEmptyNames(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->topic->subscribe('', 'sub');
     }
 }
